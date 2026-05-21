@@ -390,6 +390,26 @@ var BLOCKING_STATUSES = ["Agendado", "Confirmado", "Em atendimento"];
 var CLOUD_CFG_KEY = "bapp-cloud-v1";
 var CLOUD_TABLE = "beauty_workspaces";
 var DEFAULT_WORKSPACE_ID = "beauty-studio-karina-ket";
+var DEFAULT_SUPABASE_URL = "https://taeojfhhuuvuitvoghal.supabase.co";
+var DEFAULT_SUPABASE_PUBLIC_KEY = "sb_publishable_QRagVmcRiofjkQu5thvnZg_WHV9e7iB";
+var DEFAULT_CLOUD_CONFIG = {
+  enabled: !!(DEFAULT_SUPABASE_URL && DEFAULT_SUPABASE_PUBLIC_KEY),
+  url: DEFAULT_SUPABASE_URL,
+  anonKey: DEFAULT_SUPABASE_PUBLIC_KEY,
+  workspaceId: DEFAULT_WORKSPACE_ID,
+  lastSync: ""
+};
+var normalizeCloudConfig = (saved = {}) => {
+  const hasSavedAccess = !!(saved.url || saved.anonKey);
+  return {
+    ...DEFAULT_CLOUD_CONFIG,
+    ...saved,
+    url: saved.url || DEFAULT_CLOUD_CONFIG.url,
+    anonKey: saved.anonKey || DEFAULT_CLOUD_CONFIG.anonKey,
+    workspaceId: saved.workspaceId || DEFAULT_WORKSPACE_ID,
+    enabled: hasSavedAccess ? saved.enabled ?? DEFAULT_CLOUD_CONFIG.enabled : DEFAULT_CLOUD_CONFIG.enabled
+  };
+};
 var SUPABASE_SQL = `create table if not exists public.beauty_workspaces (
   workspace_id text primary key,
   data jsonb not null,
@@ -999,9 +1019,9 @@ function BeautyApp() {
   const [msgTemplates, setMsgTemplates] = useState(INIT.msgTemplates);
   const [cloud, setCloud] = useState(() => {
     try {
-      return { enabled: false, url: "", anonKey: "", workspaceId: DEFAULT_WORKSPACE_ID, lastSync: "", ...JSON.parse(localStorage.getItem(CLOUD_CFG_KEY) || "{}") };
+      return normalizeCloudConfig(JSON.parse(localStorage.getItem(CLOUD_CFG_KEY) || "{}"));
     } catch {
-      return { enabled: false, url: "", anonKey: "", workspaceId: DEFAULT_WORKSPACE_ID, lastSync: "" };
+      return DEFAULT_CLOUD_CONFIG;
     }
   });
   const [cloudReady, setCloudReady] = useState(false);
@@ -2607,13 +2627,13 @@ function BeautyApp() {
               /* @__PURE__ */ jsxs("div", { className: "card", children: [
                 /* @__PURE__ */ jsx("div", { className: "card-title", children: "Nuvem compartilhada" }),
                 /* @__PURE__ */ jsx("div", { className: "card-sub", children: "Supabase para Karina e KET verem a mesma agenda" }),
-                /* @__PURE__ */ jsx(Alrt, { type: "amber", icon: "\u26A0\uFE0F", children: "Antes de ativar, crie a tabela no Supabase usando o SQL abaixo. No piloto, a sincroniza\xE7\xE3o \xE9 por workspace e usa a chave p\xFAblica anon." }),
+                /* @__PURE__ */ jsx(Alrt, { type: "amber", icon: "\u26A0\uFE0F", children: "A nuvem ja esta configurada para o piloto. A sincronizacao e por workspace e usa a chave publica publishable/anon do Supabase." }),
                 /* @__PURE__ */ jsxs("div", { className: "fgrid", children: [
                   /* @__PURE__ */ jsx(Field, { label: "Supabase URL", children: /* @__PURE__ */ jsx("input", { placeholder: "https://xxxxx.supabase.co", value: cloud.url, onChange: (e) => {
                     setCloudReady(false);
                     setCloud((p) => ({ ...p, url: e.target.value.trim() }));
                   } }) }),
-                  /* @__PURE__ */ jsx(Field, { label: "Anon public key", children: /* @__PURE__ */ jsx("textarea", { placeholder: "eyJhbGciOi...", value: cloud.anonKey, onChange: (e) => {
+                  /* @__PURE__ */ jsx(Field, { label: "Publishable / anon public key", children: /* @__PURE__ */ jsx("textarea", { placeholder: "sb_publishable_... ou eyJ...", value: cloud.anonKey, onChange: (e) => {
                     setCloudReady(false);
                     setCloud((p) => ({ ...p, anonKey: e.target.value.trim() }));
                   }, style: { minHeight: 64 } }) }),
