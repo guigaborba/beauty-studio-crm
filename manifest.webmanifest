@@ -1,0 +1,20 @@
+{
+  "name": "Beauty Studio CRM",
+  "short_name": "Beauty Studio",
+  "description": "Agenda e gestao compartilhada do Beauty Studio.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1c0f17",
+  "theme_color": "#be185d",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
