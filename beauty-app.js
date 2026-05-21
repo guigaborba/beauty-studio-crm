@@ -2627,13 +2627,13 @@ function BeautyApp() {
               /* @__PURE__ */ jsxs("div", { className: "card", children: [
                 /* @__PURE__ */ jsx("div", { className: "card-title", children: "Nuvem compartilhada" }),
                 /* @__PURE__ */ jsx("div", { className: "card-sub", children: "Supabase para Karina e KET verem a mesma agenda" }),
-                /* @__PURE__ */ jsx(Alrt, { type: "amber", icon: "\u26A0\uFE0F", children: "A nuvem ja esta configurada para o piloto. A sincronizacao e por workspace e usa a chave publica publishable/anon do Supabase." }),
+                /* @__PURE__ */ jsx(Alrt, { type: "amber", icon: "\u26A0\uFE0F", children: "A nuvem j\xE1 est\xE1 configurada para o piloto. A sincroniza\xE7\xE3o \xE9 por workspace e usa a chave p\xFAblica publishable/anon do Supabase." }),
                 /* @__PURE__ */ jsxs("div", { className: "fgrid", children: [
                   /* @__PURE__ */ jsx(Field, { label: "Supabase URL", children: /* @__PURE__ */ jsx("input", { placeholder: "https://xxxxx.supabase.co", value: cloud.url, onChange: (e) => {
                     setCloudReady(false);
                     setCloud((p) => ({ ...p, url: e.target.value.trim() }));
                   } }) }),
-                  /* @__PURE__ */ jsx(Field, { label: "Publishable / anon public key", children: /* @__PURE__ */ jsx("textarea", { placeholder: "sb_publishable_... ou eyJ...", value: cloud.anonKey, onChange: (e) => {
+                  /* @__PURE__ */ jsx(Field, { label: "Chave p\xFAblica Supabase", children: /* @__PURE__ */ jsx("textarea", { placeholder: "sb_publishable_... ou eyJ...", value: cloud.anonKey, onChange: (e) => {
                     setCloudReady(false);
                     setCloud((p) => ({ ...p, anonKey: e.target.value.trim() }));
                   }, style: { minHeight: 64 } }) }),
