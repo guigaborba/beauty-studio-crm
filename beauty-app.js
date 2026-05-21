@@ -302,6 +302,9 @@ hr{border:none;border-top:1px solid ${C.border};margin:15px 0}
 .pub-pro{border:1.5px solid rgba(255,255,255,.13);background:rgba(255,255,255,.065);border-radius:999px;color:#fff;padding:8px 12px;font-size:12.5px;font-weight:800;font-family:'Outfit',sans-serif;cursor:pointer;transition:all .15s}
 .pub-pro:hover{border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.1)}
 .pub-pro.active{border-color:${C.rose};background:rgba(190,24,93,.34);box-shadow:0 5px 18px rgba(190,24,93,.22)}
+.codebox{font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;font-size:11.5px;line-height:1.45;background:${C.ink};color:#fff;border-radius:10px;border:1px solid rgba(255,255,255,.12);padding:12px;white-space:pre-wrap;max-height:240px;overflow:auto}
+.cloud-dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.cloud-ok{background:${C.green}}.cloud-warn{background:${C.amber}}.cloud-off{background:${C.mist}}.cloud-err{background:${C.danger}}
 @media(max-width:1280px){.g4{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:960px){.sidebar{display:none}.topbar{padding:12px 14px}.mobile-nav{display:block;max-width:280px}.main{padding:14px}.g4{grid-template-columns:1fr 1fr}.g3,.g2,.g21{grid-template-columns:1fr}}
 @media(max-width:600px){.topbar{align-items:stretch}.mobile-nav{max-width:none}.tb-chips{width:100%}.g4{grid-template-columns:1fr}.frow{grid-template-columns:1fr}.pub-card{padding:24px}.pub-days{grid-template-columns:repeat(2,1fr)}.pub-cal{padding:11px}.pub-cal-grid,.pub-cal-wds{gap:4px}.pub-cal-day{min-height:58px;padding:6px;border-radius:10px}.pub-cal-count{font-size:9px}.pub-summary{align-items:flex-start;flex-direction:column}}
@@ -384,6 +387,42 @@ var WORK_START = 9 * 60;
 var WORK_END = 19 * 60;
 var SLOT_STEP = 30;
 var BLOCKING_STATUSES = ["Agendado", "Confirmado", "Em atendimento"];
+var CLOUD_CFG_KEY = "bapp-cloud-v1";
+var CLOUD_TABLE = "beauty_workspaces";
+var DEFAULT_WORKSPACE_ID = "beauty-studio-karina-ket";
+var SUPABASE_SQL = `create table if not exists public.beauty_workspaces (
+  workspace_id text primary key,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.beauty_workspaces enable row level security;
+
+grant usage on schema public to anon, authenticated;
+grant select, insert, update on public.beauty_workspaces to anon, authenticated;
+
+drop policy if exists "beauty workspace read" on public.beauty_workspaces;
+drop policy if exists "beauty workspace insert" on public.beauty_workspaces;
+drop policy if exists "beauty workspace update" on public.beauty_workspaces;
+
+create policy "beauty workspace read"
+on public.beauty_workspaces
+for select
+to anon, authenticated
+using (workspace_id = 'beauty-studio-karina-ket');
+
+create policy "beauty workspace insert"
+on public.beauty_workspaces
+for insert
+to anon, authenticated
+with check (workspace_id = 'beauty-studio-karina-ket');
+
+create policy "beauty workspace update"
+on public.beauty_workspaces
+for update
+to anon, authenticated
+using (workspace_id = 'beauty-studio-karina-ket')
+with check (workspace_id = 'beauty-studio-karina-ket');`;
 var stockDeltas = (before = [], after = []) => {
   const map = /* @__PURE__ */ new Map();
   before.forEach((s) => map.set(s.productId, (map.get(s.productId) || 0) - Number(s.qty || 0)));
@@ -958,6 +997,17 @@ function BeautyApp() {
   const [goal, setGoal] = useState(INIT.goal);
   const [studio, setStudio] = useState(INIT.studio);
   const [msgTemplates, setMsgTemplates] = useState(INIT.msgTemplates);
+  const [cloud, setCloud] = useState(() => {
+    try {
+      return { enabled: false, url: "", anonKey: "", workspaceId: DEFAULT_WORKSPACE_ID, lastSync: "", ...JSON.parse(localStorage.getItem(CLOUD_CFG_KEY) || "{}") };
+    } catch {
+      return { enabled: false, url: "", anonKey: "", workspaceId: DEFAULT_WORKSPACE_ID, lastSync: "" };
+    }
+  });
+  const [cloudReady, setCloudReady] = useState(false);
+  const [cloudBusy, setCloudBusy] = useState(false);
+  const [cloudMsg, setCloudMsg] = useState("");
+  const [cloudKind, setCloudKind] = useState("off");
   const [selectedDate, setSelectedDate] = useState(todayISO);
   const [calMonth, setCalMonth] = useState(startOfMonth(todayISO));
   const [selectedClientId, setSelectedClientId] = useState("c1");
@@ -983,8 +1033,15 @@ function BeautyApp() {
     } catch (e) {
     }
   }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(CLOUD_CFG_KEY, JSON.stringify(cloud));
+    } catch (e) {
+    }
+  }, [cloud]);
   const appData = useMemo(() => ({ users, clients, techniques, appointments, attendances, products, coupons, combos, holidays, links, goal, studio, msgTemplates }), [users, clients, techniques, appointments, attendances, products, coupons, combos, holidays, links, goal, studio, msgTemplates]);
   useAutoSave(appData);
+  const cloudConfigured = !!(cloud.url && cloud.anonKey && cloud.workspaceId);
   const clientMap = useMemo(() => Object.fromEntries(clients.map((c) => [c.id, c])), [clients]);
   const techMap = useMemo(() => Object.fromEntries(techniques.map((t) => [t.id, t])), [techniques]);
   const userMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users]);
@@ -1310,6 +1367,84 @@ function BeautyApp() {
     if (d.studio && typeof d.studio === "object") setStudio(d.studio);
     if (Array.isArray(d.msgTemplates)) setMsgTemplates(d.msgTemplates);
   };
+  const cloudHeaders = (extra = {}) => ({
+    apikey: cloud.anonKey,
+    Authorization: `Bearer ${cloud.anonKey}`,
+    ...extra
+  });
+  const cloudBase = () => `${cloud.url.replace(/\/$/, "")}/rest/v1/${CLOUD_TABLE}`;
+  const setCloudState = (msg, kind = "off") => {
+    setCloudMsg(msg);
+    setCloudKind(kind);
+  };
+  const pullCloud = async (showToast = true) => {
+    if (!cloudConfigured) {
+      setCloudState("Preencha URL, anon key e workspace.", "warn");
+      return;
+    }
+    setCloudBusy(true);
+    try {
+      const res = await fetch(`${cloudBase()}?workspace_id=eq.${encodeURIComponent(cloud.workspaceId)}&select=data,updated_at`, { headers: cloudHeaders() });
+      if (!res.ok) throw new Error(await res.text());
+      const rows = await res.json();
+      if (rows[0]?.data) {
+        applyImportedData(rows[0].data);
+        setCloud((p) => ({ ...p, lastSync: (/* @__PURE__ */ new Date()).toISOString() }));
+        setCloudReady(true);
+        setCloudState(`Dados baixados da nuvem${rows[0].updated_at ? ` (${new Date(rows[0].updated_at).toLocaleString("pt-BR")})` : ""}.`, "ok");
+        if (showToast) toast("Dados baixados da nuvem!");
+      } else {
+        setCloudReady(true);
+        setCloudState("Workspace vazio. Clique em Enviar dados atuais para criar a base.", "warn");
+        if (showToast) toast("Workspace vazio. Envie os dados atuais.", "warn");
+      }
+    } catch (e) {
+      setCloudReady(false);
+      setCloudState("Erro ao baixar da nuvem. Confira SQL, URL e anon key.", "err");
+      if (showToast) toast("Erro ao baixar da nuvem.", "error");
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+  const pushCloud = async (showToast = true) => {
+    if (!cloudConfigured) {
+      setCloudState("Preencha URL, anon key e workspace.", "warn");
+      return;
+    }
+    setCloudBusy(true);
+    try {
+      const res = await fetch(`${cloudBase()}?on_conflict=workspace_id`, {
+        method: "POST",
+        headers: cloudHeaders({ "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" }),
+        body: JSON.stringify([{ workspace_id: cloud.workspaceId, data: appData, updated_at: (/* @__PURE__ */ new Date()).toISOString() }])
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setCloud((p) => ({ ...p, lastSync: (/* @__PURE__ */ new Date()).toISOString() }));
+      setCloudReady(true);
+      setCloudState("Dados enviados para a nuvem.", "ok");
+      if (showToast) toast("Dados enviados para a nuvem!");
+    } catch (e) {
+      setCloudReady(false);
+      setCloudState("Erro ao enviar para a nuvem. Confira SQL, URL e anon key.", "err");
+      if (showToast) toast("Erro ao enviar para a nuvem.", "error");
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+  useEffect(() => {
+    if (!cloud.enabled || !cloudConfigured) return;
+    pullCloud(false);
+  }, []);
+  useEffect(() => {
+    if (!cloud.enabled || !cloudConfigured || !cloudReady) return;
+    const t = setTimeout(() => pushCloud(false), 2600);
+    return () => clearTimeout(t);
+  }, [appData, cloud.enabled, cloudReady]);
+  useEffect(() => {
+    if (!cloud.enabled || !cloudConfigured || !cloudReady) return;
+    const t = setInterval(() => pullCloud(false), 3e4);
+    return () => clearInterval(t);
+  }, [cloud.enabled, cloudReady, cloud.url, cloud.anonKey, cloud.workspaceId]);
   const exportBackup = () => {
     const blob = new Blob([JSON.stringify(appData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -2469,6 +2604,52 @@ function BeautyApp() {
               ] }, u.id))
             ] }),
             /* @__PURE__ */ jsxs("div", { style: { display: "flex", flexDirection: "column", gap: 16 }, children: [
+              /* @__PURE__ */ jsxs("div", { className: "card", children: [
+                /* @__PURE__ */ jsx("div", { className: "card-title", children: "Nuvem compartilhada" }),
+                /* @__PURE__ */ jsx("div", { className: "card-sub", children: "Supabase para Karina e KET verem a mesma agenda" }),
+                /* @__PURE__ */ jsx(Alrt, { type: "amber", icon: "\u26A0\uFE0F", children: "Antes de ativar, crie a tabela no Supabase usando o SQL abaixo. No piloto, a sincroniza\xE7\xE3o \xE9 por workspace e usa a chave p\xFAblica anon." }),
+                /* @__PURE__ */ jsxs("div", { className: "fgrid", children: [
+                  /* @__PURE__ */ jsx(Field, { label: "Supabase URL", children: /* @__PURE__ */ jsx("input", { placeholder: "https://xxxxx.supabase.co", value: cloud.url, onChange: (e) => {
+                    setCloudReady(false);
+                    setCloud((p) => ({ ...p, url: e.target.value.trim() }));
+                  } }) }),
+                  /* @__PURE__ */ jsx(Field, { label: "Anon public key", children: /* @__PURE__ */ jsx("textarea", { placeholder: "eyJhbGciOi...", value: cloud.anonKey, onChange: (e) => {
+                    setCloudReady(false);
+                    setCloud((p) => ({ ...p, anonKey: e.target.value.trim() }));
+                  }, style: { minHeight: 64 } }) }),
+                  /* @__PURE__ */ jsx(Field, { label: "Workspace ID", children: /* @__PURE__ */ jsx("input", { value: cloud.workspaceId, onChange: (e) => {
+                    setCloudReady(false);
+                    setCloud((p) => ({ ...p, workspaceId: e.target.value.trim() || DEFAULT_WORKSPACE_ID }));
+                  } }) }),
+                  /* @__PURE__ */ jsxs("label", { className: "cl-item", style: { margin: 0 }, children: [
+                    /* @__PURE__ */ jsx("input", { type: "checkbox", checked: cloud.enabled, onChange: (e) => {
+                      setCloudReady(false);
+                      setCloud((p) => ({ ...p, enabled: e.target.checked }));
+                    } }),
+                    /* @__PURE__ */ jsx("span", { className: "cl-text", children: "Ativar sincroniza\xE7\xE3o autom\xE1tica" })
+                  ] }),
+                  /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 7, flexWrap: "wrap" }, children: [
+                    /* @__PURE__ */ jsx("button", { className: "btn btn-p btn-sm", disabled: cloudBusy, onClick: () => pullCloud(true), children: "\u2601 Baixar da nuvem" }),
+                    /* @__PURE__ */ jsx("button", { className: "btn btn-g btn-sm", disabled: cloudBusy, onClick: () => pushCloud(true), children: "\u2191 Enviar dados atuais" }),
+                    /* @__PURE__ */ jsx("button", { className: "btn btn-g btn-sm", onClick: () => {
+                      navigator.clipboard?.writeText(SUPABASE_SQL);
+                      toast("SQL copiado!");
+                    }, children: "\u{1F4CB} Copiar SQL" })
+                  ] }),
+                  /* @__PURE__ */ jsxs("div", { style: { display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: C.mist }, children: [
+                    /* @__PURE__ */ jsx("span", { className: `cloud-dot cloud-${cloudKind}` }),
+                    /* @__PURE__ */ jsx("span", { children: cloudBusy ? "Sincronizando..." : cloudMsg || "Nuvem ainda n\xE3o configurada." })
+                  ] }),
+                  cloud.lastSync && /* @__PURE__ */ jsxs("div", { style: { fontSize: 11, color: C.mist }, children: [
+                    "\xDAltima sincroniza\xE7\xE3o neste navegador: ",
+                    new Date(cloud.lastSync).toLocaleString("pt-BR")
+                  ] }),
+                  /* @__PURE__ */ jsxs("details", { children: [
+                    /* @__PURE__ */ jsx("summary", { style: { fontSize: 12, fontWeight: 700, cursor: "pointer", color: C.rose }, children: "Ver SQL da tabela" }),
+                    /* @__PURE__ */ jsx("div", { className: "codebox", style: { marginTop: 8 }, children: SUPABASE_SQL })
+                  ] })
+                ] })
+              ] }),
               /* @__PURE__ */ jsxs("div", { className: "card", children: [
                 /* @__PURE__ */ jsx("div", { className: "card-title", children: "Feriados" }),
                 /* @__PURE__ */ jsxs("div", { className: "fgrid", children: [
