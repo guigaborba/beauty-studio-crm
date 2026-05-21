@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="72" y1="52" x2="454" y2="466" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#be185d"/>
+      <stop offset="1" stop-color="#1c0f17"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="156" y1="132" x2="368" y2="388" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff7ed"/>
+      <stop offset="1" stop-color="#f9a8d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="374" cy="132" r="60" fill="#ffffff" opacity=".08"/>
+  <path d="M255 88c11 69 50 108 119 119-69 11-108 50-119 119-11-69-50-108-119-119 69-11 108-50 119-119Z" fill="url(#shine)"/>
+  <path d="M166 330c8 42 32 66 74 74-42 8-66 32-74 74-8-42-32-66-74-74 42-8 66-32 74-74Z" fill="#fff7ed" opacity=".9"/>
+  <text x="256" y="362" text-anchor="middle" font-family="Georgia, serif" font-size="64" font-weight="700" fill="#fff7ed">BS</text>
+</svg>
