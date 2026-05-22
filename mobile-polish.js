@@ -20,7 +20,17 @@
       button.setAttribute("aria-label", "Abrir menu");
       button.textContent = "☰";
       topbar.insertBefore(button, topbar.firstChild);
+    }
+
+    if (!button.dataset.mobilePolished) {
+      button.dataset.mobilePolished = "1";
       button.addEventListener("click", openMenu);
+    }
+
+    if (window.innerWidth <= 960) {
+      sidebar.style.transform = sidebar.classList.contains("open") ? "translateX(0)" : "translateX(-104%)";
+    } else {
+      sidebar.style.transform = "";
     }
 
     sidebar.querySelectorAll(".sb-btn").forEach(function (item) {
